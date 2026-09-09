@@ -50,7 +50,7 @@ One config entry, one device, five entities. With the entry named *Last*:
 | Entity | What it is |
 |---|---|
 | `button.last_record` | Press when the thing happens. |
-| `sensor.last_total` | Running total, `state_class: total_increasing` — so it gets permanent hourly long-term statistics and works with date-based chart cards. |
+| `sensor.last_total` | Running total. Its `statistic_id` attribute names the long-term statistic (`occurrence_tracker:last`) that date-based charts should read — see [Long-term statistics](#long-term-statistics). |
 | `sensor.last_last` | Timestamp of the most recent occurrence. |
 | `sensor.last_by_hour` | State is the busiest hour (`"14:00"`). Attributes carry the full 24-hour profile. |
 | `sensor.last_by_weekday` | State is the busiest day (`"Saturday"`). Attributes carry the full 7-day profile. |
@@ -79,6 +79,9 @@ weekday-versus-weekend, month of year: all of it can be added later and will
 apply to everything already recorded. A design built on counters throws that
 away at the moment of recording and can never get it back.
 
+The long-term statistics the integration writes are a *projection* of that list
+— derived from it on every change — never a substitute for it.
+
 Bucketing happens in **local time** via `dt_util.as_local`, so an event at 23:30
 UTC in July lands in the 00:00 bucket of the following day, as it should. This
 is the part that makes the obvious alternative — querying the recorder database
@@ -103,8 +106,10 @@ data:
   timestamp: "2026-09-01 14:30:00"
 ```
 
-Removing occurrences makes `sensor.*_total` drop. Home Assistant reads that as a
-meter reset on a `total_increasing` sensor and carries on correctly.
+| `occurrence_tracker.rebuild_statistics` | Rewrites the long-term statistics from the stored timestamps. Only needed if the two drift — a database restored from an older backup, say. |
+
+Removing an occurrence is a real correction: the long-term statistics are
+rewritten from the remaining timestamps, so the count goes down everywhere.
 
 ## Charting the profiles
 
@@ -132,13 +137,54 @@ That card has no `day_of_week` time unit, so the weekday profile is better drawn
 from `counts` by any card that can plot a plain list, or read straight off the
 sensor's state ("busiest day").
 
-`sensor.*_total` carries long-term statistics, so it also drives ordinary
-date-based charts — a day × hour heatmap, a GitHub-style year calendar, a weekly
-count — with `aggregate_func: change`.
+## Long-term statistics
+
+Every tracker also writes an **external statistic** — `occurrence_tracker:last`
+for a tracker named *Last* — into Home Assistant's long-term statistics. That is
+what drives ordinary date-based charts: a day × hour heatmap, a GitHub-style
+year calendar, a weekly count. Point the card at the statistic id rather than at
+an entity:
+
+```yaml
+type: custom:statistics-graph-chart-card
+chart_mode: heatmap
+group_by: hour
+hours_to_show: 2160
+entities:
+  - statistic_id: occurrence_tracker:last
+    aggregate_func: change
+```
+
+HA's built-in statistics-graph card reads the same id. The id is fixed when the
+tracker is first set up and shown in `sensor.*_total`'s `statistic_id`
+attribute; renaming the tracker afterwards doesn't change it.
+
+### Why not just a `total_increasing` sensor?
+
+Because the recorder compiles a sensor's statistics from its *state
+transitions*, and a transition doesn't say what it means. Two things go wrong:
+
+- **Backfills land on the wrong day.** Recording something that happened in
+  July changes the sensor's state *now*, so the recorder books it now.
+- **Removals double-count.** `total_increasing` reads any drop below 90% of the
+  previous value as a meter reset and starts a fresh cycle from the new value.
+  Removing one of five occurrences yields a sum of *nine*, not four.
+
+An external statistic has no sensor behind it. The integration owns the rows and
+writes them from the timestamps it holds, so a backfilled occurrence sits on the
+hour it happened and a removal genuinely subtracts. The rows are sparse — one per
+hour that has an occurrence, carrying the cumulative total — and Home Assistant
+derives the count in any period as `sum(end) − sum(start)`, so per-hour,
+per-day and per-month figures all come out right.
+
+**The timestamps remain the source of truth.** The statistics are a projection
+of them, rebuilt from them, never the other way round. If the two ever disagree
+— after restoring an older database backup, say — `rebuild_statistics` puts the
+statistics back in line with the timestamps.
 
 ## Requirements
 
-Home Assistant 2024.8.0 or newer.
+Home Assistant 2025.4.0 or newer (for `StatisticMeanType` in the statistics API).
 
 ## License
 

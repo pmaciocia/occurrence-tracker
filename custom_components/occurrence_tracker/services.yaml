@@ -21,3 +21,9 @@ clear:
     entity:
       integration: occurrence_tracker
       domain: button
+
+rebuild_statistics:
+  target:
+    entity:
+      integration: occurrence_tracker
+      domain: button

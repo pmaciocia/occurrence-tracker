@@ -4,16 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import OccurrenceConfigEntry
-from .const import WEEKDAY_NAMES
+from .const import ATTR_STATISTIC_ID, CONF_STATISTIC_ID, WEEKDAY_NAMES
 from .entity import OccurrenceEntity
 
 
@@ -37,24 +33,30 @@ async def async_setup_entry(
 class TotalSensor(OccurrenceEntity, SensorEntity):
     """Running total of recorded occurrences.
 
-    total_increasing is what earns this sensor permanent hourly long-term
-    statistics, which is what date-based charts read. Removing an occurrence
-    makes the value drop; Home Assistant reads that as a meter reset and carries
-    on, which is the behaviour we want.
+    Deliberately carries no state_class. Long-term statistics for this tracker
+    are written by the integration itself under the id in the ``statistic_id``
+    attribute; letting the recorder compile a second series from this sensor's
+    state transitions would put backfills on the wrong day and mis-count
+    removals as meter resets.
     """
 
     _attr_name = "Total"
     _attr_icon = "mdi:counter"
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
     def __init__(self, entry, store) -> None:
         """Initialise the sensor."""
         super().__init__(entry, store, "total")
+        self._statistic_id = entry.data.get(CONF_STATISTIC_ID)
 
     @property
     def native_value(self) -> int:
         """Return the number of recorded occurrences."""
         return self._store.total
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Point at the statistic that date-based charts should read."""
+        return {ATTR_STATISTIC_ID: self._statistic_id}
 
 
 class LastSensor(OccurrenceEntity, SensorEntity):

@@ -14,7 +14,7 @@
   "services": {
     "record": {
       "name": "Record",
-      "description": "Records that the tracked thing happened. Use the timestamp field to enter an occurrence you remember from the past.",
+      "description": "Records that the tracked thing happened. Use the timestamp field to enter an occurrence you remember from the past; it lands on the day and hour it happened.",
       "fields": {
         "timestamp": {
           "name": "Timestamp",
@@ -29,6 +29,10 @@
     "clear": {
       "name": "Clear",
       "description": "Deletes every recorded occurrence. This cannot be undone."
+    },
+    "rebuild_statistics": {
+      "name": "Rebuild statistics",
+      "description": "Rewrites this tracker's long-term statistics from its stored timestamps. Only needed if the two have drifted apart, for example after restoring an older database backup."
     }
   }
 }

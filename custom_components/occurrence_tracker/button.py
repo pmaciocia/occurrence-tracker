@@ -12,7 +12,13 @@ from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import OccurrenceConfigEntry
-from .const import ATTR_TIMESTAMP, SERVICE_CLEAR, SERVICE_RECORD, SERVICE_REMOVE_LAST
+from .const import (
+    ATTR_TIMESTAMP,
+    SERVICE_CLEAR,
+    SERVICE_REBUILD_STATISTICS,
+    SERVICE_RECORD,
+    SERVICE_REMOVE_LAST,
+)
 from .entity import OccurrenceEntity
 
 
@@ -32,6 +38,9 @@ async def async_setup_entry(
         SERVICE_REMOVE_LAST, None, "async_service_remove_last"
     )
     platform.async_register_entity_service(SERVICE_CLEAR, None, "async_service_clear")
+    platform.async_register_entity_service(
+        SERVICE_REBUILD_STATISTICS, None, "async_service_rebuild_statistics"
+    )
 
     async_add_entities([RecordButton(entry, entry.runtime_data)])
 
@@ -54,7 +63,8 @@ class RecordButton(OccurrenceEntity, ButtonEntity):
         """Record an occurrence, optionally at a given past time.
 
         This is the backfill path: it lets a remembered occurrence be entered
-        after the fact, and it lands in the right hour and weekday bucket.
+        after the fact, and it lands in the right hour and weekday bucket — and
+        on the right day in long-term statistics.
         """
         await self._store.async_record(timestamp)
 
@@ -65,3 +75,11 @@ class RecordButton(OccurrenceEntity, ButtonEntity):
     async def async_service_clear(self) -> None:
         """Forget every recorded occurrence."""
         await self._store.async_clear()
+
+    async def async_service_rebuild_statistics(self) -> None:
+        """Rewrite the long-term statistics from the stored timestamps.
+
+        The safety valve for the rare case where the two drift — a database
+        restored from an older backup, or statistics deleted by hand.
+        """
+        self._store.async_rebuild_statistics()
