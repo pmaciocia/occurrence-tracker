@@ -40,8 +40,8 @@ directory so you end up with
 then give it a name. Add as many as you like — each gets its own device and its
 own stored history.
 
-Deleting a config entry deletes its recorded occurrences too, so nothing is left
-orphaned in `.storage`.
+Deleting a config entry deletes its recorded occurrences and its long-term
+statistics with it, so nothing is left orphaned in `.storage` or the recorder.
 
 ## What it creates
 
@@ -90,13 +90,14 @@ same conversion and a fixed offset silently breaks across BST.
 
 ## Services
 
-All three target the button entity.
+All four target the button entity.
 
 | Service | Purpose |
 |---|---|
-| `occurrence_tracker.record` | Record an occurrence. The optional `timestamp` field records one in the **past** — the backfill path for events you remember but never logged. |
+| `occurrence_tracker.record` | Record an occurrence. The optional `timestamp` field records one in the **past** — the backfill path for events you remember but never logged. It lands on the day and hour it happened, in the profiles and in the statistics. |
 | `occurrence_tracker.remove_last` | Undo the most recent occurrence, for an accidental press. |
 | `occurrence_tracker.clear` | Forget everything. Not undoable. |
+| `occurrence_tracker.rebuild_statistics` | Rewrite the long-term statistics from the stored timestamps. Only needed if the two drift — after restoring an older database backup, say. |
 
 ```yaml
 action: occurrence_tracker.record
@@ -105,8 +106,6 @@ target:
 data:
   timestamp: "2026-09-01 14:30:00"
 ```
-
-| `occurrence_tracker.rebuild_statistics` | Rewrites the long-term statistics from the stored timestamps. Only needed if the two drift — a database restored from an older backup, say. |
 
 Removing an occurrence is a real correction: the long-term statistics are
 rewritten from the remaining timestamps, so the count goes down everywhere.
@@ -133,9 +132,22 @@ entities:
     decimals: 0
 ```
 
-That card has no `day_of_week` time unit, so the weekday profile is better drawn
-from `counts` by any card that can plot a plain list, or read straight off the
-sensor's state ("busiest day").
+That card has no `day_of_week` time unit. The weekday profile is easiest as a
+markdown card drawing a bar table from `counts` — no extra card needed:
+
+```yaml
+type: markdown
+content: |
+  {% set c = state_attr('sensor.last_by_weekday','counts') or [0,0,0,0,0,0,0] %}
+  {% set names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+  {% set m = [c | max, 1] | max %}
+  | Day | | Count |
+  |:--|:--|--:|
+  {% for i in range(7) %}| {{ names[i] }} | {{ '#' * ((c[i] * 16) // m) }} | {{ c[i] }} |
+  {% endfor %}
+```
+
+Or read the busiest day straight off the sensor's state.
 
 ## Long-term statistics
 
@@ -157,7 +169,8 @@ entities:
 
 HA's built-in statistics-graph card reads the same id. The id is fixed when the
 tracker is first set up and shown in `sensor.*_total`'s `statistic_id`
-attribute; renaming the tracker afterwards doesn't change it.
+attribute; renaming the tracker afterwards doesn't change it. If two trackers
+would get the same id, the second gets a `_2` suffix.
 
 ### Why not just a `total_increasing` sensor?
 
@@ -181,6 +194,14 @@ per-day and per-month figures all come out right.
 of them, rebuilt from them, never the other way round. If the two ever disagree
 — after restoring an older database backup, say — `rebuild_statistics` puts the
 statistics back in line with the timestamps.
+
+## Upgrading from 1.0
+
+On first start after upgrading, each tracker allocates its statistic id and
+writes every existing occurrence into long-term statistics on the hour it
+happened. The old series the recorder compiled from `sensor.*_total` is left in
+place but no longer updated; **Developer Tools → Statistics** will flag it and
+offer to delete it. Then point any date-based charts at the new statistic id.
 
 ## Requirements
 
