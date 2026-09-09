@@ -1,0 +1,23 @@
+record:
+  target:
+    entity:
+      integration: occurrence_tracker
+      domain: button
+  fields:
+    timestamp:
+      required: false
+      example: "2026-09-01 14:30:00"
+      selector:
+        datetime:
+
+remove_last:
+  target:
+    entity:
+      integration: occurrence_tracker
+      domain: button
+
+clear:
+  target:
+    entity:
+      integration: occurrence_tracker
+      domain: button

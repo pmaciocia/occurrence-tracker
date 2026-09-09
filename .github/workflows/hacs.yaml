@@ -1,0 +1,20 @@
+name: HACS validation
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 4 * * *"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Skips the brands check, which only applies to repositories being
+          # submitted to the HACS default store. This one is installed as a
+          # custom repository.
+          ignore: brands

@@ -1,0 +1,34 @@
+{
+  "title": "Occurrence Tracker",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Track a recurring event",
+        "description": "Give the thing you want to track a name. A button and a set of sensors will be created for it.",
+        "data": {
+          "name": "Name"
+        }
+      }
+    }
+  },
+  "services": {
+    "record": {
+      "name": "Record",
+      "description": "Records that the tracked thing happened. Use the timestamp field to enter an occurrence you remember from the past.",
+      "fields": {
+        "timestamp": {
+          "name": "Timestamp",
+          "description": "When it happened. Defaults to now. A time without a timezone is read as local time."
+        }
+      }
+    },
+    "remove_last": {
+      "name": "Remove last",
+      "description": "Deletes the most recently recorded occurrence. Use this to undo an accidental press."
+    },
+    "clear": {
+      "name": "Clear",
+      "description": "Deletes every recorded occurrence. This cannot be undone."
+    }
+  }
+}
